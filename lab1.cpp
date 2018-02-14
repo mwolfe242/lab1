@@ -42,10 +42,9 @@ using namespace std;
 #include <GL/glx.h>
 #include "fonts.h"
 #include "log.h"
-
+const int MAX_POINTS = 100000;
 const int MAX_PARTICLES = 1000000;
 const float GRAVITY = 0.1;
-
 //some structures
 
 struct Vec {
@@ -62,29 +61,40 @@ struct Particle {
     Shape s;
     Vec velocity;
     int c;
+    int hit;
+    Particle(){
+		hit=0;
+	}
+};
+struct Point{
+	float x,y;
 };
 
 class Global {
     public:
 	int xres, yres;
 	Particle particle[MAX_PARTICLES];
+	Point point[MAX_POINTS];
+	Point texpoint[MAX_POINTS];
+	int npoints;
 	Shape box[5];
 	Shape circle;
 	int n;
 	Global() {
 	    xres = 800;
 	    yres = 600;
+	    npoints = 200;
 	    //define a box shape
 	    for(int i=0;i<5;i++)
 	    {
 		box[i].width = 100;
 		box[i].height = 10;
-		box[i].center.x = 100 + 60*i;
-		box[i].center.y = yres-15-60*i;
+		box[i].center.x = 100 + 90*i;
+		box[i].center.y = yres-30-60*i;
 		n = 0;
 	    }
-	    circle.radius=100;
-	    circle.center.x=700;
+	    circle.radius=300;
+	    circle.center.x=650;
 	    circle.center.y=-100;
 	    
 	}
@@ -149,6 +159,7 @@ class X11_wrapper {
 	}
 } x11;
 
+
 //Function prototypes
 void init_opengl(void);
 void check_mouse(XEvent *e);
@@ -210,7 +221,7 @@ void makeParticle(int x, int y)
 	    g.particle[g.n].c=r;
 	    p->s.center.x = x;
 	    p->s.center.y = y;
-	    p->velocity.y =0;
+	    p->velocity.y =1;
 	    p->velocity.x =((float)rand()/(float)RAND_MAX)+.1;
 	    ++g.n;
 	}
@@ -235,8 +246,8 @@ void check_mouse(XEvent *e)
     if (e->type == ButtonPress) {
 	if (e->xbutton.button==1) {
 	    //Left button was pressed
-	    int y = g.yres - e->xbutton.y;
-	    makeParticle(0, g.yres);
+	    //int y = g.yres - e->xbutton.y;
+	    //makeParticle(0, g.yres);
 	    return;
 	}
 	if (e->xbutton.button==3) {
@@ -249,8 +260,8 @@ void check_mouse(XEvent *e)
 	if (savex != e->xbutton.x || savey != e->xbutton.y) {
 	    savex = e->xbutton.x;
 	    savey = e->xbutton.y;
-	    int y = g.yres;
-	    makeParticle(0, y);
+	    //int y = g.yres;
+	    //makeParticle(0, y);
 
 
 	}
@@ -325,35 +336,78 @@ void movement()
 
 	    }
 	}
-/*	    Shape *s = &g.circle;
-	    float distx = p->s.center.x-s.center[0];
+	    float distx = p->s.center.x-g.circle.center.x;
 	    if(distx<0)
 		distx=0-distx;
-	    float disty = p->s.center.y-s.center[1];
+	    float disty = p->s.center.y-g.circle.center.y;
 	    if(disty<0)
 		disty=0-disty;
-	    float dist = sqrt(distx*distx+p->disty*p->disty);
-	    if(dist<s.radius){
-		Vec temp;
-	       	temp[0] = p->s.center.x-s.center[0];
-		temp[1] = p->s.center.y-s.center[1];
-		Vec norm;
-		norm[0]=temp[0]/s.radius;
-		norm[1]=temp[1]/s.radius;
-		float dot = 
-
-
-
+	    float dist = sqrt(distx*distx+disty*disty);
+	    if(dist<g.circle.radius){
+		float temp[2];
+	       	temp[0] = p->s.center.x-g.circle.center.x;
+		temp[1] = p->s.center.y-g.circle.center.y;
+		float norm[2];
+		norm[0]=temp[0]/g.circle.radius;
+		norm[1]=temp[1]/g.circle.radius;
+		float dot = -(p->velocity.x*norm[0]+p->velocity.y*norm[1]);
+		float len = 2.0*dot;
+		p->s.center.x+=norm[0]*5;
+		p->s.center.y+=norm[1]*5;
+		//pnorm[0]=norm[1];
+		//pnorm[1]=norm[0];
+		//else{
+			p->velocity.x = ((len *norm[0]+p->velocity.x)*(norm[1]/1.25));
+			p->velocity.y = ((len *norm[1]+p->velocity.y)*(-norm[0]/1.25));
+		//}
+	} 
 	    //check for off-screen
 	    if (p->s.center.y<0) {
 		cout << "off screen" << endl;
 		g.particle[i] = g.particle[--g.n];
 	    }
 	}
-	*/
+	
     }
+const float PI = 3.14159265358979;
+void makeCircle(){
+	
+	float angle = 0.0;
+    float inc = PI * 2 / (float)g.npoints;
+    for (int i=0;i<g.npoints;i++){
+        g.point[i].x = cos(angle) * g.circle.radius;
+        g.point[i].y = sin(angle) * g.circle.radius;
+		g.texpoint[i].x = cos(angle)/2+.46;
+		g.texpoint[i].y = -sin(angle)/2+.51;
+        angle += inc;
+    }
+    glPushMatrix();
+    glTranslatef(g.circle.center.x, g.circle.center.y, 0.0);
+    glBegin(GL_LINE_LOOP);
+    glColor3ub(90,160,90);
+    for(int i=0;i<g.npoints;i++){
+        glVertex2f(g.point[i].x, g.point[i].y);
+    }
+    glEnd();
+    glPopMatrix();
+    glPushMatrix();
+    glTranslatef(g.circle.center.x,g.circle.center.y, 0.0);
+    glBegin(GL_TRIANGLE_FAN);
+    for(int i=0;i<g.npoints-1;i++){
+        glColor3ub(90,160,90);
+        glVertex2f(g.point[0].x,g.point[0].y);
+        glVertex2f(g.point[i].x,g.point[i].y);
+        glVertex2f(g.point[i+1].x,g.point[i+1].y);
+    }
+
+    glEnd();
+    glPopMatrix();
+
 }
 
+	
+	
+	
 void render()
 {
     glClear(GL_COLOR_BUFFER_BIT);
@@ -378,6 +432,9 @@ void render()
 	glEnd();
 	glPopMatrix();
     }
+    glColor3ub(30,60,90);
+    makeCircle();
+    makeParticle(30,g.yres-10);
     //
     //Draw the particle here.
     for(int i=0;i<g.n;i++){
